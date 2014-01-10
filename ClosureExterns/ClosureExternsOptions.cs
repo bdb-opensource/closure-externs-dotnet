@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BDBPayroll.Billing.API.Web.JSCodeGenerator
+namespace ClosureExterns
 {
     /// <summary>
     /// Represents a set of options to use when generating closure annotations (externs).

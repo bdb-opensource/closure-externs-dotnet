@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Text;
 using QuickGraph.Algorithms;
 
-namespace BDBPayroll.Billing.API.Web.JSCodeGenerator
+namespace ClosureExterns
 {
     public class ClosureExternsGenerator
     {
