@@ -104,7 +104,7 @@ namespace ClosureExterns
             var processedTypes = new HashSet<Type>();
             while (true)
             {
-                var unprocessedTypes = graph.Vertices.Except(processedTypes);
+                var unprocessedTypes = graph.Vertices.Except(processedTypes).ToArray();
                 if (false == unprocessedTypes.Any())
                 {
                     break;

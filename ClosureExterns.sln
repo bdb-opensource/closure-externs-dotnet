@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClosureExterns", "ClosureExterns.csproj", "{155DADD4-AB60-4FC9-AEB0-A57245120BAE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClosureExterns", "ClosureExterns\ClosureExterns.csproj", "{155DADD4-AB60-4FC9-AEB0-A57245120BAE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClosureExterns.Tests", "ClosureExterns.Tests\ClosureExterns.Tests.csproj", "{ACE5E201-D096-4585-87F7-ADB9ADA49B7E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +15,10 @@ Global
 		{155DADD4-AB60-4FC9-AEB0-A57245120BAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{155DADD4-AB60-4FC9-AEB0-A57245120BAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{155DADD4-AB60-4FC9-AEB0-A57245120BAE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ACE5E201-D096-4585-87F7-ADB9ADA49B7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ACE5E201-D096-4585-87F7-ADB9ADA49B7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ACE5E201-D096-4585-87F7-ADB9ADA49B7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ACE5E201-D096-4585-87F7-ADB9ADA49B7E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
