@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>ClosureExterns.NET</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>https://github.com/bdb-opensource/closure-externs-dotnet/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/bdb-opensource/closure-externs-dotnet</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>Initial release.</releaseNotes>
+    <copyright>Copyright 2014 BDBPayroll Inc.</copyright>
+    <tags>JavaScript Closure GoogleClosure Compiler Externs Annotations</tags>
+  </metadata>
+</package>
