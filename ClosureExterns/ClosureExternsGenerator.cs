@@ -16,7 +16,7 @@ namespace ClosureExterns
         protected ClosureExternsGenerator(IEnumerable<Type> types, ClosureExternsOptions options)
         {
             this._options = options;
-            this._types = types.ToArray();
+            this._types = (types ?? new Type[] { }).Select(MapType).ToArray();
             this._assemblies = this._types.GroupBy(x => x.Assembly)
                                           .Select(x => x.Key)
                                           .ToArray();
@@ -161,7 +161,7 @@ namespace ClosureExterns
             }
             foreach (var annotation in this._options.ConstructorAnnotations(className))
             {
-                typeResultBuilder.AppendLine(" * " + String.Format(annotation, className));
+                typeResultBuilder.AppendLine(" * " + annotation);
             }
             typeResultBuilder.AppendLine(" */");
             typeResultBuilder.AppendLine(className + " = " + this._options.ConstructorExpression(className) + ";");
@@ -184,6 +184,10 @@ namespace ClosureExterns
 
         private object GetDefaultJSValue(Type type)
         {
+            if (type.IsGenericType && IsGenericTypeNullable(type))
+            {
+                return "null";
+            }
             if (type.Equals(typeof(string)))
             {
                 return "''";
@@ -220,22 +224,25 @@ namespace ClosureExterns
                 return propertyType.Name;
             }
             var overrideTypeName = this._options.TryGetTypeName(propertyType);
-            if (false == String.IsNullOrWhiteSpace(overrideTypeName))
+            if (String.IsNullOrWhiteSpace(overrideTypeName))
             {
-                return overrideTypeName;
-            }
-            if (propertyType.IsGenericType)
-            {
-                var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
-                if (null != enumerableType)
+                if (propertyType.IsGenericType)
                 {
-                    return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
+                    if (IsGenericTypeNullable(propertyType))
+                    {
+                        return "?" + GetJSTypeName(sourceType, Nullable.GetUnderlyingType(propertyType), graph);
+                    }
+                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
+                    if (null != enumerableType)
+                    {
+                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
+                    }
                 }
-            }
-            if (propertyType.IsArray)
-            {
-                var elementType = propertyType.GetElementType();
-                return GetJSArrayTypeName(sourceType, elementType, graph);
+                if (propertyType.IsArray)
+                {
+                    var elementType = propertyType.GetElementType();
+                    return GetJSArrayTypeName(sourceType, elementType, graph);
+                }
             }
             graph.AddVertex(propertyType);
             graph.AddVertex(sourceType);
@@ -244,7 +251,12 @@ namespace ClosureExterns
                 graph.AddEdge(new QuickGraph.Edge<Type>(sourceType, propertyType));
                 return this.GetFullTypeName(propertyType);
             }
-            return GetTypeName(propertyType);
+            return overrideTypeName ?? GetTypeName(propertyType);
+        }
+
+        private static bool IsGenericTypeNullable(Type propertyType)
+        {
+            return propertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
         }
 
         private string GetJSArrayTypeName(Type sourceType, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
@@ -304,7 +316,8 @@ namespace ClosureExterns
 
         private string GetFullTypeName(Type type)
         {
-            return this._options.NamespaceVarName + "." + GetTypeName(type);
+            var overrideTypeName = this._options.TryGetTypeName(type);
+            return this._options.NamespaceVarName + "." + (overrideTypeName ?? GetTypeName(type));
         }
 
         #endregion

@@ -11,6 +11,7 @@ namespace ClosureExterns.Tests
         {
             public string StringValue { get; set; }
             public int IntValue { get; set; }
+            public Nullable<int> NullableIntValue { get; set; }
             public B B { get; set; }
             public B[] Bs { get; set; }
         }
@@ -22,7 +23,7 @@ namespace ClosureExterns.Tests
 
 
         [TestMethod]
-        public void ClosureExternsGenerator_Generate()
+        public void ClosureExternsGenerator_Generate_Test()
         {
             var types = new Type[] { typeof(A) };
             var actual = ClosureExternsGenerator.Generate(types);
@@ -45,12 +46,109 @@ Types.A = function() {};
 Types.A.prototype.stringValue = '';
 /** @type {number} */
 Types.A.prototype.intValue = 0;
+/** @type {?number} */
+Types.A.prototype.nullableIntValue = null;
 /** @type {Types.B} */
 Types.A.prototype.b = null;
 /** @type {Array.<Types.B>} */
-Types.A.prototype.bs = null;>";
+Types.A.prototype.bs = null;
+";
 
             Assert.AreEqual(expected.Trim(), actual.Trim()); 
+        }
+
+        
+        protected class AClass
+        {
+            public string StringValue { get; set; }
+            public int IntValue { get; set; }
+            public BClass B { get; set; }
+            public BClass[] Bs { get; set; }
+            public CClass C { get; set; }
+        }
+
+        protected class BClass
+        {
+            public int[] IntArray { get; set; }
+        }
+
+        protected class CClass
+        {
+            public Nullable<int> NullableInt { get; set; }
+        }
+
+        [TestMethod]
+        public void ClosureExternsGenerator_GenerateWithOptions_MapType_Test()
+        {
+            var types = new Type[] { typeof(AClass) };
+            var testOptions = GetTestOptions();
+            testOptions.MapType = x => typeof(Boolean);
+            var actual = ClosureExternsGenerator.Generate(types, testOptions);
+
+            var expected = @"
+/** @const */
+var TestNamespace = {};";
+
+            Assert.AreEqual(expected.Trim(), actual.Trim());
+        }
+
+        [TestMethod]
+        public void ClosureExternsGenerator_GenerateWithOptions_Test()
+        {
+            var types = new Type[] { typeof(AClass) };
+            var testOptions = GetTestOptions();
+            var actual = ClosureExternsGenerator.Generate(types, testOptions);
+
+            var expected = @"
+/** @const */
+var TestNamespace = {};
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+BClass
+/** @constructor
+ * @something TestNamespace.Bee
+ */
+TestNamespace.Bee = function TestNamespace.Bee() { };
+/** @type {Array.<number>} */
+TestNamespace.Bee.prototype.intArray = null;
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+CClass
+/** @constructor
+ * @something TestNamespace.C
+ */
+TestNamespace.C = function TestNamespace.C() { };
+/** @type {?number} */
+TestNamespace.C.prototype.nullableInt = null;
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+AClass
+/** @constructor
+ * @something TestNamespace.A
+ */
+TestNamespace.A = function TestNamespace.A() { };
+/** @type {string} */
+TestNamespace.A.prototype.stringValue = '';
+/** @type {number} */
+TestNamespace.A.prototype.intValue = 0;
+/** @type {TestNamespace.Bee} */
+TestNamespace.A.prototype.b = null;
+/** @type {Array.<TestNamespace.Bee>} */
+TestNamespace.A.prototype.bs = null;
+/** @type {TestNamespace.C} */
+TestNamespace.A.prototype.c = null;
+";
+
+            Assert.AreEqual(expected.Trim(), actual.Trim());
+        }
+
+        private static ClosureExternsOptions GetTestOptions()
+        {
+            return new ClosureExternsOptions()
+            {
+                ConstructorAnnotations = x => new string[] { "@something " + x },
+                ConstructorExpression = x => "function " + x + "() { }",
+                NamespaceVarName = "TestNamespace",
+                SuffixToTrimFromTypeNames = "Class",
+                TryGetTypeName = x => x.Equals(typeof(BClass)) ? "Bee" : null
+            };
         }
     }
 }
