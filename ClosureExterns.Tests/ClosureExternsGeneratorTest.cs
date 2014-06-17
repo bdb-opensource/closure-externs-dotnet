@@ -92,6 +92,21 @@ var TestNamespace = {};";
             Assert.AreEqual(expected.Trim(), actual.Trim());
         }
 
+
+        [TestMethod]
+        public void ClosureExternsGenerator_GenerateWithOptions_NamespaceExpression_Test()
+        {
+            var types = new Type[] { };
+            var testOptions = GetTestOptions();
+            testOptions.NamespaceDefinitionExpression = x => String.Format("goog.provide('{0}');", x);
+            var actual = ClosureExternsGenerator.Generate(types, testOptions);
+
+            var expected = "goog.provide('TestNamespace');";
+
+            Assert.AreEqual(expected.Trim(), actual.Trim());
+        }
+
+
         [TestMethod]
         public void ClosureExternsGenerator_GenerateWithOptions_Test()
         {

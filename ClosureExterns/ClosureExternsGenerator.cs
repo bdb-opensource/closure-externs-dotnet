@@ -75,8 +75,7 @@ namespace ClosureExterns
             graph.AddVertexRange(_types);
 
             var typeDefinitions = new Dictionary<Type, String>();
-            resultBuilder.AppendLine("/** @const */");
-            resultBuilder.AppendLine("var " + this._options.NamespaceVarName + " = {};");
+            resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(this._options.NamespaceVarName));
             resultBuilder.AppendLine();
 
             GenerateTypeDefinitions(this._options.NamespaceVarName, graph, typeDefinitions);
@@ -237,6 +236,14 @@ namespace ClosureExterns
                     {
                         return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
                     }
+                    var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IDictionary<,>)));
+                    if (null != dictionaryType)
+                    {
+                        var typeArgs = dictionaryType.GetGenericArguments().ToArray();
+                        var keyType = typeArgs[0];
+                        var valueType = typeArgs[1];
+                        return GetJSObjectTypeName(sourceType, keyType, valueType);
+                    }
                 }
                 if (propertyType.IsArray)
                 {
@@ -262,6 +269,11 @@ namespace ClosureExterns
         private string GetJSArrayTypeName(Type sourceType, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
             return "Array.<" + GetJSTypeName(sourceType, propertyType, graph) + ">";
+        }
+
+        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType)
+        {
+            return "Object.<" + keyType.Name + ", " + valueType.Name + ">";
         }
 
         protected string GetTypeName(Type type)

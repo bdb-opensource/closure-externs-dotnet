@@ -14,6 +14,7 @@ namespace ClosureExterns
         public ClosureExternsOptions()
         {
             this.NamespaceVarName = "Types";
+            this.NamespaceDefinitionExpression = x => String.Format("/** @const */" + Environment.NewLine + "var {0} = {{}};", x);
             this.ConstructorAnnotations = x => new string[0];
             this.SuffixToTrimFromTypeNames = "dto";
             this.ConstructorExpression = x => "function() {}";
@@ -26,6 +27,11 @@ namespace ClosureExterns
         /// <para>Default is: "Types"</para>
         /// </summary>
         public string NamespaceVarName { get; set; }
+
+        /// <summary>
+        /// An expression to define the namespace var. Default is: x => String.Format("var {0};", x);
+        /// </summary>
+        public Func<string, string> NamespaceDefinitionExpression { get; set; }
 
         /// <summary>
         /// An expression to use for when defining constructors. Useful for creating derived types.
