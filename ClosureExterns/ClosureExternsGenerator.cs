@@ -231,18 +231,18 @@ namespace ClosureExterns
                     {
                         return "?" + GetJSTypeName(sourceType, Nullable.GetUnderlyingType(propertyType), graph);
                     }
-                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
-                    if (null != enumerableType)
-                    {
-                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
-                    }
                     var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IDictionary<,>)));
                     if (null != dictionaryType)
                     {
                         var typeArgs = dictionaryType.GetGenericArguments().ToArray();
                         var keyType = typeArgs[0];
                         var valueType = typeArgs[1];
-                        return GetJSObjectTypeName(sourceType, keyType, valueType);
+                        return GetJSObjectTypeName(sourceType, keyType, valueType, graph);
+                    }
+                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
+                    if (null != enumerableType)
+                    {
+                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
                     }
                 }
                 if (propertyType.IsArray)
@@ -271,9 +271,9 @@ namespace ClosureExterns
             return "Array.<" + GetJSTypeName(sourceType, propertyType, graph) + ">";
         }
 
-        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType)
+        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Object.<" + keyType.Name + ", " + valueType.Name + ">";
+            return "Object.<" + GetJSTypeName(sourceType, keyType, graph) + ", " + GetJSTypeName(sourceType, valueType, graph) + ">";
         }
 
         protected string GetTypeName(Type type)

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -105,6 +106,32 @@ var TestNamespace = {};";
 
             Assert.AreEqual(expected.Trim(), actual.Trim());
         }
+
+        protected class DictClass
+        {
+            public Dictionary<string, int> DictProperty { get; set; }
+        }
+
+        [TestMethod]
+        public void ClosureExternsGenerator_DictClass_Test()
+        {
+            var types = new Type[] { typeof(DictClass) };
+            var actual = ClosureExternsGenerator.Generate(types);
+            var expected = @"
+/** @const */
+var Types = {};
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+DictClass
+/** @constructor
+ */
+Types.DictClass = function() {};
+/** @type {Object.<string, number>} */
+Types.DictClass.prototype.dictProperty = null;
+";
+
+            Assert.AreEqual(expected.Trim(), actual.Trim());
+        }
+
 
 
         [TestMethod]
