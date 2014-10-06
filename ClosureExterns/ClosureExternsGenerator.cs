@@ -127,7 +127,7 @@ namespace ClosureExterns
 
         protected void GenerateTypeDefinition(string closureNamespaceVar, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph, Dictionary<Type, string> typeDefinitions, Type type)
         {
-            if (type.IsClass)
+            if (type.IsClass || this.IsStruct(type))
             {
                 var typeResultBuilder = GenerateClassDefinition(type, graph);
                 typeDefinitions.Add(type, typeResultBuilder.ToString());
@@ -138,6 +138,11 @@ namespace ClosureExterns
                 var typeResultBuilder = GenerateEnumDefinition(type, graph);
                 typeDefinitions.Add(type, typeResultBuilder.ToString());
             }
+        }
+
+        protected bool IsStruct(Type type)
+        {
+            return (type.IsValueType && !type.IsPrimitive && !type.IsEnum);
         }
 
         protected Type MapType(Type type)
@@ -199,7 +204,7 @@ namespace ClosureExterns
             {
                 return this.GetFullTypeName(type) + "." + Enum.GetName(type, Activator.CreateInstance(type));
             }
-            if (type.IsValueType && (false == type.Equals(typeof(DateTime))))
+            if (type.IsValueType && (type.Namespace.StartsWith("System")) && (false == type.Equals(typeof(DateTime))))
             {
                 return Activator.CreateInstance(type);
             }
@@ -231,18 +236,18 @@ namespace ClosureExterns
                     {
                         return "?" + GetJSTypeName(sourceType, Nullable.GetUnderlyingType(propertyType), graph);
                     }
-                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
-                    if (null != enumerableType)
-                    {
-                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
-                    }
                     var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IDictionary<,>)));
                     if (null != dictionaryType)
                     {
                         var typeArgs = dictionaryType.GetGenericArguments().ToArray();
                         var keyType = typeArgs[0];
                         var valueType = typeArgs[1];
-                        return GetJSObjectTypeName(sourceType, keyType, valueType);
+                        return GetJSObjectTypeName(sourceType, keyType, valueType, graph);
+                    }
+                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
+                    if (null != enumerableType)
+                    {
+                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
                     }
                 }
                 if (propertyType.IsArray)
@@ -271,9 +276,9 @@ namespace ClosureExterns
             return "Array.<" + GetJSTypeName(sourceType, propertyType, graph) + ">";
         }
 
-        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType)
+        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Object.<" + keyType.Name + ", " + valueType.Name + ">";
+            return "Object.<" + GetJSTypeName(sourceType, keyType, graph) + ", " + GetJSTypeName(sourceType, valueType, graph) + ">";
         }
 
         protected string GetTypeName(Type type)
