@@ -9,6 +9,8 @@ namespace ClosureExterns
 {
     public class ClosureExternsGenerator
     {
+        public const string JSHINT_IGNORE_LINE = "//jshint ignore:line";
+        
         protected readonly Assembly[] _assemblies;
         protected readonly Type[] _types;
         protected readonly ClosureExternsOptions _options;
@@ -179,36 +181,11 @@ namespace ClosureExterns
                 var mappedType = MapType(property.PropertyType);
                 var jsTypeName = GetJSTypeName(type, mappedType, graph);
                 typeResultBuilder.AppendLine(String.Format("/** @type {{{0}}} */", jsTypeName));
-                typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1} = {2};", className, propertyName, GetDefaultJSValue(mappedType)));
+                typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1}; {2}", className, propertyName, JSHINT_IGNORE_LINE));
             }
 
             typeResultBuilder.AppendLine();
             return typeResultBuilder;
-        }
-
-        private object GetDefaultJSValue(Type type)
-        {
-            if (type.IsGenericType && IsGenericTypeNullable(type))
-            {
-                return "null";
-            }
-            if (type.Equals(typeof(string)))
-            {
-                return "''";
-            }
-            if (type.Equals(typeof(bool)))
-            {
-                return "false";
-            }
-            if (type.IsEnum)
-            {
-                return this.GetFullTypeName(type) + "." + Enum.GetName(type, Activator.CreateInstance(type));
-            }
-            if (type.IsValueType && (type.Namespace.StartsWith("System")) && (false == type.Equals(typeof(DateTime))))
-            {
-                return Activator.CreateInstance(type);
-            }
-            return "null";
         }
 
         protected static void AppendTypeComment(StringBuilder typeResultBuilder, Type type)
