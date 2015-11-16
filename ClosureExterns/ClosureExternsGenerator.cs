@@ -89,7 +89,7 @@ namespace ClosureExterns
                 }
                 else if (false == type.Assembly.Equals(Assembly.GetAssembly(typeof(string))))
                 {
-                    resultBuilder.AppendLine("// unknown: " + type.Name + "\n");
+                    resultBuilder.AppendLine("// unknown: " + type.Name + Environment.NewLine);
                 }
             }
 
@@ -319,7 +319,7 @@ namespace ClosureExterns
             typeResultBuilder.AppendLine(GetFullTypeName(type) + " = {");
             foreach (var pair in WithIsLast(Enum.GetNames(type)))
             {
-                typeResultBuilder.AppendFormat("    {0}: '{0}'{1}\n", pair.Item1, pair.Item2 ? String.Empty : ",");
+                typeResultBuilder.AppendFormat("    {0}: '{0}'{1}{2}", pair.Item1, pair.Item2 ? String.Empty : ",", Environment.NewLine);
             }
             typeResultBuilder.AppendLine("};");
             typeResultBuilder.AppendLine();
