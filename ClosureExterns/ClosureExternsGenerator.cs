@@ -170,7 +170,7 @@ namespace ClosureExterns
             {
                 var property = propertyPair.Item1;
                 var isLast = propertyPair.Item2;
-                string propertyName = property.Name.Substring(0, 1).ToLowerInvariant() + property.Name.Substring(1);
+                string propertyName = this.GetPropertyName(property);
                 var mappedType = MapType(property.PropertyType);
                 var jsTypeName = GetJSTypeName(type, mappedType, graph);
                 typeResultBuilder.AppendLine(String.Format("/** @type {{{0}}} */", jsTypeName));
@@ -181,17 +181,35 @@ namespace ClosureExterns
             return typeResultBuilder;
         }
 
+        private string GetPropertyName(PropertyInfo property)
+        {
+            var customPropertyName = this._options.TryGetPropertyName(property.Name);
+            if (false == string.IsNullOrEmpty(customPropertyName))
+            {
+                return customPropertyName;
+            }
+            // TODO: Improve the bahavior, it should be able to change casing to lower based on words.
+            return property.Name.Substring(0, 1).ToLowerInvariant() + property.Name.Substring(1);
+        }
+
         private object GetDefaultJSValue(Type type)
         {
+            var customValue = this._options.TryGetDefaultJSValue(type);
+            if (null != customValue)
+            {
+                return customValue;
+            }
             if (type.IsGenericType && IsGenericTypeNullable(type))
             {
                 return "null";
             }
-            if (type.Equals(typeof(string)))
+            if ((type == typeof(string)) ||
+                (type == typeof(char)) ||
+                (type == typeof(Guid)))
             {
                 return "''";
             }
-            if (type.Equals(typeof(bool)))
+            if (type == typeof(bool))
             {
                 return "false";
             }
@@ -199,7 +217,7 @@ namespace ClosureExterns
             {
                 return this.GetFullTypeName(type) + "." + Enum.GetName(type, Activator.CreateInstance(type));
             }
-            if (type.IsValueType && (false == type.Equals(typeof(DateTime))))
+            if (type.IsValueType && (type != typeof(DateTime)))
             {
                 return Activator.CreateInstance(type);
             }
@@ -279,10 +297,10 @@ namespace ClosureExterns
         protected string GetTypeName(Type type)
         {
             // Strip `1 (or `2, etc.) suffix from generic types
-            var typeName = new String(type.Name.TakeWhile(Char.IsLetterOrDigit).ToArray());
+            var typeName = new string(type.Name.TakeWhile(char.IsLetterOrDigit).ToArray());
             if (InAllowedAssemblies(type))
             {
-                if (false == String.IsNullOrWhiteSpace(this._options.SuffixToTrimFromTypeNames))
+                if (false == string.IsNullOrWhiteSpace(this._options.SuffixToTrimFromTypeNames))
                 {
                     return TrimSuffix(typeName, this._options.SuffixToTrimFromTypeNames);
                 }
