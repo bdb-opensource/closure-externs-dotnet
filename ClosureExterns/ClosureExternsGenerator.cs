@@ -297,6 +297,8 @@ namespace ClosureExterns
                 case "float": return "number";
                 case "int32": return "number";
                 case "datetime": return "Date";
+                case "char" : return "string";
+                case "guid" : return "string";
                 default: return "?";
             }
         }
