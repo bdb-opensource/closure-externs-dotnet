@@ -170,7 +170,7 @@ namespace ClosureExterns
             {
                 var property = propertyPair.Item1;
                 var isLast = propertyPair.Item2;
-                string propertyName = this.GetPropertyName(property);
+                string propertyName = this.GetPropertyName(type, property.Name);
                 var mappedType = MapType(property.PropertyType);
                 var jsTypeName = GetJSTypeName(type, mappedType, graph);
                 typeResultBuilder.AppendLine(String.Format("/** @type {{{0}}} */", jsTypeName));
@@ -181,15 +181,15 @@ namespace ClosureExterns
             return typeResultBuilder;
         }
 
-        private string GetPropertyName(PropertyInfo property)
+        private string GetPropertyName(Type type, string propertyName)
         {
-            var customPropertyName = this._options.TryGetPropertyName(property.Name);
+            var customPropertyName = this._options.TryGetPropertyName(type, propertyName);
             if (false == string.IsNullOrEmpty(customPropertyName))
             {
                 return customPropertyName;
             }
-            // TODO: Improve the bahavior, it should be able to change casing to lower based on words.
-            return property.Name.Substring(0, 1).ToLowerInvariant() + property.Name.Substring(1);
+            // TODO: Improve the behavior, it should be able to change casing to lower based on words.
+            return propertyName.Substring(0, 1).ToLowerInvariant() + propertyName.Substring(1);
         }
 
         private object GetDefaultJSValue(Type type)
@@ -339,7 +339,9 @@ namespace ClosureExterns
             typeResultBuilder.AppendLine(GetFullTypeName(type) + " = {");
             foreach (var pair in WithIsLast(Enum.GetNames(type)))
             {
-                typeResultBuilder.AppendFormat("    {0}: '{0}'{1}{2}", pair.Item1, pair.Item2 ? String.Empty : ",", Environment.NewLine);
+                string propertyName = this.GetPropertyName(type, pair.Item1);
+                var spacing = pair.Item2 ? String.Empty : ",";
+                typeResultBuilder.AppendFormat("    {0}: '{0}'{1}{2}", propertyName, spacing, Environment.NewLine);
             }
             typeResultBuilder.AppendLine("};");
             typeResultBuilder.AppendLine();

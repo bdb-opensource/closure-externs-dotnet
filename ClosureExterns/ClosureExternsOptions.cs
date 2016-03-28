@@ -20,7 +20,7 @@ namespace ClosureExterns
             this.ConstructorExpression = x => "function() {}";
             this.MapType = x => x;
             this.TryGetTypeName = x => null;
-            this.TryGetPropertyName = x => null;
+            this.TryGetPropertyName = (x, y) => null;
             this.TryGetDefaultJSValue = x => null;
         }
 
@@ -77,7 +77,7 @@ namespace ClosureExterns
         /// <para>Returns null to signify that there is no special substitution, and that the generator should
         /// generate a name based on the default behavior.</para>
         /// </summary>
-        public Func<string, string> TryGetPropertyName { get; set; }
+        public Func<Type, string, string> TryGetPropertyName { get; set; }
 
         /// <summary>
         /// A function that optionally generates a default JS value for a specific type
