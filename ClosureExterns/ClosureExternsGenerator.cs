@@ -188,8 +188,14 @@ namespace ClosureExterns
             {
                 return customPropertyName;
             }
-            // TODO: Improve the behavior, it should be able to change casing to lower based on words.
-            return propertyName.Substring(0, 1).ToLowerInvariant() + propertyName.Substring(1);
+
+            if(false == type.IsEnum)
+            {
+                // TODO: Improve the behavior, it should be able to change casing to lower based on words.
+                return propertyName.Substring(0, 1).ToLowerInvariant() + propertyName.Substring(1);
+            }
+
+            return propertyName;
         }
 
         private object GetDefaultJSValue(Type type)
@@ -339,9 +345,10 @@ namespace ClosureExterns
             typeResultBuilder.AppendLine(GetFullTypeName(type) + " = {");
             foreach (var pair in WithIsLast(Enum.GetNames(type)))
             {
-                string propertyName = this.GetPropertyName(type, pair.Item1);
+                string propertyValue = pair.Item1;
+                string propertyName = this.GetPropertyName(type, propertyValue);
                 var spacing = pair.Item2 ? String.Empty : ",";
-                typeResultBuilder.AppendFormat("    {0}: '{0}'{1}{2}", propertyName, spacing, Environment.NewLine);
+                typeResultBuilder.AppendFormat("    '{0}': '{1}'{2}{3}", propertyName, propertyValue, spacing, Environment.NewLine);
             }
             typeResultBuilder.AppendLine("};");
             typeResultBuilder.AppendLine();
