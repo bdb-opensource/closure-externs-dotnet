@@ -10,16 +10,22 @@ namespace ClosureExterns
     public class ClosureExternsGenerator
     {
         protected readonly Assembly[] _assemblies;
-        protected readonly Type[] _types;
+        protected readonly IDictionary<string, IEnumerable<Type>> _typesMap;
         protected readonly ClosureExternsOptions _options;
+        protected IDictionary<Type, string> _typeNamespaceMap;
 
-        protected ClosureExternsGenerator(IEnumerable<Type> types, ClosureExternsOptions options)
+        protected ClosureExternsGenerator(IDictionary<string, IEnumerable<Type>> typesMap, ClosureExternsOptions options)
         {
             this._options = options;
-            this._types = (types ?? new Type[] { }).Select(MapType).ToArray();
-            this._assemblies = this._types.GroupBy(x => x.Assembly)
-                                          .Select(x => x.Key)
-                                          .ToArray();
+            this._typesMap = (typesMap ?? new Dictionary<string, IEnumerable<Type>> { }).ToDictionary(p => p.Key, p => p.Value.Select(this.MapType));
+            this._typeNamespaceMap = this._typesMap
+                .SelectMany(p => p.Value
+                    .Select(t => new KeyValuePair<Type, string>(t, p.Key)))
+                .ToDictionary(x => x.Key, x => x.Value);
+            this._assemblies = this._typesMap.SelectMany(p => p.Value)
+                .GroupBy(x => x.Assembly)
+                .Select(x => x.Key)
+                .ToArray();
         }
 
         #region Public Methods
@@ -31,12 +37,11 @@ namespace ClosureExterns
         /// <para>(e.g. if a property of a type is of some type not in the list, that type will be generated as well)</para>
         /// </param>
         /// <returns></returns>
-        public static string Generate(IEnumerable<Type> types, ClosureExternsOptions options)
+        public static string Generate(IDictionary<string, IEnumerable<Type>> typesMap, ClosureExternsOptions options)
         {
-            var generator = new ClosureExternsGenerator(types, options);
+            var generator = new ClosureExternsGenerator(typesMap, options);
             return generator.Generate();
         }
-
 
         /// <summary>
         /// Generates closure externs using the default options.
@@ -45,9 +50,9 @@ namespace ClosureExterns
         /// <para>(e.g. if a property of a type is of some type not in the list, that type will be generated as well)</para>
         /// </param>
         /// <returns></returns>
-        public static string Generate(IEnumerable<Type> types)
+        public static string Generate(IDictionary<string, IEnumerable<Type>> typesMap)
         {
-            var generator = new ClosureExternsGenerator(types, new ClosureExternsOptions());
+            var generator = new ClosureExternsGenerator(typesMap, new ClosureExternsOptions());
             return generator.Generate();
         }
 
@@ -59,8 +64,8 @@ namespace ClosureExterns
             var targetNamespace = exampleType.Namespace;
             return exampleType.Assembly
                               .GetTypes()
-                // Anonymous types have null namespace
-                              .Where(x => (null != x.Namespace) && x.Namespace.StartsWith(targetNamespace));
+                              // Anonymous types have null namespace
+                              .Where(x => (null != x.Namespace) && x.Namespace.Equals(targetNamespace));
         }
 
         #endregion
@@ -70,16 +75,22 @@ namespace ClosureExterns
         protected string Generate()
         {
             var resultBuilder = new StringBuilder();
-
+            var typeDefinitions = new Dictionary<Type, string>();
             var graph = new QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>>(false);
-            graph.AddVertexRange(_types);
+            if (false == this._typesMap.Any())
+            {
+                resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(this._options.NamespaceVarName));
+                resultBuilder.AppendLine();
+            }
+            foreach (var typePair in this._typesMap)
+            {
+                graph.AddVertexRange(typePair.Value.Except(graph.Vertices));
+                var @namespace = String.Empty == typePair.Key ? this._options.NamespaceVarName : typePair.Key;
+                resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(@namespace));
+                resultBuilder.AppendLine();
 
-            var typeDefinitions = new Dictionary<Type, String>();
-            resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(this._options.NamespaceVarName));
-            resultBuilder.AppendLine();
-
-            GenerateTypeDefinitions(this._options.NamespaceVarName, graph, typeDefinitions);
-
+                GenerateTypeDefinitions(@namespace, graph, typeDefinitions);
+            }
             foreach (var type in graph.TopologicalSort().Reverse())
             {
                 string definition;
@@ -96,7 +107,7 @@ namespace ClosureExterns
             return resultBuilder.ToString();
         }
 
-        protected void GenerateTypeDefinitions(string closureNamespaceVar, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph, Dictionary<Type, string> typeDefinitions)
+        protected void GenerateTypeDefinitions(string @namespace, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph, IDictionary<Type, string> typeDefinitions)
         {
             // Every time we generate a type, we may find new type dependencies and they will be added to the graph.
             // We keep generating types as long as the graph contains items that were not generated.
@@ -115,7 +126,11 @@ namespace ClosureExterns
                     {
                         continue;
                     }
-                    GenerateTypeDefinition(closureNamespaceVar, graph, typeDefinitions, type);
+                    if (typeDefinitions.ContainsKey(type))
+                    {
+                        continue;
+                    }
+                    GenerateTypeDefinition(@namespace, graph, typeDefinitions, type);
                 }
             }
         }
@@ -125,17 +140,17 @@ namespace ClosureExterns
             return this._assemblies.Any(x => x.Equals(type.Assembly));
         }
 
-        protected void GenerateTypeDefinition(string closureNamespaceVar, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph, Dictionary<Type, string> typeDefinitions, Type type)
+        protected void GenerateTypeDefinition(string @namespace, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph, IDictionary<Type, string> typeDefinitions, Type type)
         {
             if (type.IsClass)
             {
-                var typeResultBuilder = GenerateClassDefinition(type, graph);
+                var typeResultBuilder = GenerateClassDefinition(@namespace, type, graph);
                 typeDefinitions.Add(type, typeResultBuilder.ToString());
             }
 
             if (type.IsEnum)
             {
-                var typeResultBuilder = GenerateEnumDefinition(type, graph);
+                var typeResultBuilder = GenerateEnumDefinition(@namespace, type, graph);
                 typeDefinitions.Add(type, typeResultBuilder.ToString());
             }
         }
@@ -145,11 +160,11 @@ namespace ClosureExterns
             return this._options.MapType(type);
         }
 
-        protected StringBuilder GenerateClassDefinition(Type type, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        protected StringBuilder GenerateClassDefinition(string @namespace, Type type, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
             Console.Error.WriteLine("Generating Class: " + type.Name);
             var typeResultBuilder = new StringBuilder();
-            var className = this.GetFullTypeName(type);
+            var className = this.GetFullTypeName(@namespace, type);
             AppendTypeComment(typeResultBuilder, type);
 
             typeResultBuilder.AppendLine("/** @constructor");
@@ -169,12 +184,11 @@ namespace ClosureExterns
             foreach (var propertyPair in WithIsLast(properties))
             {
                 var property = propertyPair.Item1;
-                var isLast = propertyPair.Item2;
                 string propertyName = this.GetPropertyName(type, property.Name);
                 var mappedType = MapType(property.PropertyType);
-                var jsTypeName = GetJSTypeName(type, mappedType, graph);
+                var jsTypeName = GetJSTypeName(type, @namespace, mappedType, graph);
                 typeResultBuilder.AppendLine(String.Format("/** @type {{{0}}} */", jsTypeName));
-                typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1} = {2};", className, propertyName, GetDefaultJSValue(mappedType)));
+                typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1} = {2};", className, propertyName, GetDefaultJSValue(@namespace, mappedType)));
             }
 
             typeResultBuilder.AppendLine();
@@ -189,7 +203,7 @@ namespace ClosureExterns
                 return customPropertyName;
             }
 
-            if(false == type.IsEnum)
+            if (false == type.IsEnum)
             {
                 // TODO: Improve the behavior, it should be able to change casing to lower based on words.
                 return propertyName.Substring(0, 1).ToLowerInvariant() + propertyName.Substring(1);
@@ -198,7 +212,7 @@ namespace ClosureExterns
             return propertyName;
         }
 
-        private object GetDefaultJSValue(Type type)
+        private object GetDefaultJSValue(string @namespace, Type type)
         {
             var customValue = this._options.TryGetDefaultJSValue(type);
             if (null != customValue)
@@ -221,7 +235,7 @@ namespace ClosureExterns
             }
             if (type.IsEnum)
             {
-                return this.GetFullTypeName(type) + "." + Enum.GetName(type, Activator.CreateInstance(type));
+                return this.GetFullTypeName(@namespace, type) + "." + Enum.GetName(type, Activator.CreateInstance(type));
             }
             if (type.IsValueType && (type != typeof(DateTime)))
             {
@@ -240,7 +254,7 @@ namespace ClosureExterns
             return items.Select((p, i) => new Tuple<T, bool>(p, i + 1 == items.Count()));
         }
 
-        protected string GetJSTypeName(Type sourceType, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        protected string GetJSTypeName(Type sourceType, string @namespace, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
             if (propertyType.IsGenericParameter)
             {
@@ -253,26 +267,26 @@ namespace ClosureExterns
                 {
                     if (IsGenericTypeNullable(propertyType))
                     {
-                        return "?" + GetJSTypeName(sourceType, Nullable.GetUnderlyingType(propertyType), graph);
+                        return "?" + GetJSTypeName(sourceType, @namespace, Nullable.GetUnderlyingType(propertyType), graph);
                     }
-                    var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IDictionary<,>)));
+                    var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IDictionary<,>));
                     if (null != dictionaryType)
                     {
                         var typeArgs = dictionaryType.GetGenericArguments().ToArray();
                         var keyType = typeArgs[0];
                         var valueType = typeArgs[1];
-                        return GetJSObjectTypeName(sourceType, keyType, valueType, graph);
+                        return GetJSObjectTypeName(sourceType, @namespace, keyType, valueType, graph);
                     }
-                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)));
+                    var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IEnumerable<>));
                     if (null != enumerableType)
                     {
-                        return GetJSArrayTypeName(sourceType, enumerableType.GetGenericArguments().Single(), graph);
+                        return GetJSArrayTypeName(sourceType, @namespace, enumerableType.GetGenericArguments().Single(), graph);
                     }
                 }
                 if (propertyType.IsArray)
                 {
                     var elementType = propertyType.GetElementType();
-                    return GetJSArrayTypeName(sourceType, elementType, graph);
+                    return GetJSArrayTypeName(sourceType, @namespace, elementType, graph);
                 }
             }
             graph.AddVertex(propertyType);
@@ -280,7 +294,7 @@ namespace ClosureExterns
             if (InAllowedAssemblies(propertyType))
             {
                 graph.AddEdge(new QuickGraph.Edge<Type>(sourceType, propertyType));
-                return this.GetFullTypeName(propertyType);
+                return this.GetFullTypeName(@namespace, propertyType);
             }
             return overrideTypeName ?? GetTypeName(propertyType);
         }
@@ -290,14 +304,14 @@ namespace ClosureExterns
             return propertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
         }
 
-        private string GetJSArrayTypeName(Type sourceType, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        private string GetJSArrayTypeName(Type sourceType, string @namespace, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Array.<" + GetJSTypeName(sourceType, propertyType, graph) + ">";
+            return "Array.<" + GetJSTypeName(sourceType, @namespace, propertyType, graph) + ">";
         }
 
-        private string GetJSObjectTypeName(Type sourceType, Type keyType, Type valueType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        private string GetJSObjectTypeName(Type sourceType, string @namespace, Type keyType, Type valueType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Object.<" + GetJSTypeName(sourceType, keyType, graph) + ", " + GetJSTypeName(sourceType, valueType, graph) + ">";
+            return "Object.<" + GetJSTypeName(sourceType, @namespace, keyType, graph) + ", " + GetJSTypeName(sourceType, @namespace, valueType, graph) + ">";
         }
 
         protected string GetTypeName(Type type)
@@ -321,8 +335,8 @@ namespace ClosureExterns
                 case "float": return "number";
                 case "int32": return "number";
                 case "datetime": return "Date";
-                case "char" : return "string";
-                case "guid" : return "string";
+                case "char": return "string";
+                case "guid": return "string";
                 default: return "?";
             }
         }
@@ -336,13 +350,13 @@ namespace ClosureExterns
             return stringToTrim;
         }
 
-        protected StringBuilder GenerateEnumDefinition(Type type, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        protected StringBuilder GenerateEnumDefinition(string @namespace, Type type, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
             Console.Error.WriteLine("Generating Enum: " + type.Name);
             var typeResultBuilder = new StringBuilder();
             AppendTypeComment(typeResultBuilder, type);
             typeResultBuilder.AppendLine("/** @enum {string} */");
-            typeResultBuilder.AppendLine(GetFullTypeName(type) + " = {");
+            typeResultBuilder.AppendLine(GetFullTypeName(@namespace, type) + " = {");
             foreach (var pair in WithIsLast(Enum.GetNames(type)))
             {
                 string propertyValue = pair.Item1;
@@ -355,10 +369,15 @@ namespace ClosureExterns
             return typeResultBuilder;
         }
 
-        private string GetFullTypeName(Type type)
+        private string GetFullTypeName(string @namespace, Type type)
         {
+            string typeNamespace;
+            if (false == this._typeNamespaceMap.TryGetValue(type, out typeNamespace))
+            {
+                typeNamespace = @namespace;
+            }
             var overrideTypeName = this._options.TryGetTypeName(type);
-            return this._options.NamespaceVarName + "." + (overrideTypeName ?? GetTypeName(type));
+            return typeNamespace + "." + (overrideTypeName ?? GetTypeName(type));
         }
 
         #endregion
