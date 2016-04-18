@@ -13,7 +13,7 @@ namespace ClosureExterns
     {
         public ClosureExternsOptions()
         {
-            this.NamespaceVarName = "Types";
+            this.NamespaceVarName = "TestNamespace";
             this.NamespaceDefinitionExpression = x => String.Format("/** @const */" + Environment.NewLine + "var {0} = {{}};", x);
             this.ConstructorAnnotations = x => new string[0];
             this.SuffixToTrimFromTypeNames = "dto";
@@ -50,7 +50,7 @@ namespace ClosureExterns
         public Func<string, string[]> ConstructorAnnotations { get; set; }
 
         /// <summary>
-        /// A string that should be trimmed from the end of all type names, case-insensitive. 
+        /// A string that should be trimmed from the end of all type names, case-insensitive.
         /// <para>(e.g. "dto" will caused "MyDTO" to be trimmed to "My")</para>
         /// <para>Default is: "dto"</para>
         /// </summary>
@@ -58,7 +58,7 @@ namespace ClosureExterns
 
         /// <summary>
         /// A function to map input types to actual types to be outputted. Useful for converting some property types of an object
-        /// into something else (e.g. your special ID type into a string) that represents how it will actually be serialized to 
+        /// into something else (e.g. your special ID type into a string) that represents how it will actually be serialized to
         /// json.
         /// <para>Default is: x => x</para>
         /// </summary>
