@@ -33,9 +33,10 @@ namespace ClosureExterns
         /// <summary>
         /// Generates closure externs using the given options.
         /// </summary>
-        /// <param name="types">A set of base types to generate. Any dependencies will also be included recursively
+        /// <param name="typesMap">A set of base types to generate. Any dependencies will also be included recursively
         /// <para>(e.g. if a property of a type is of some type not in the list, that type will be generated as well)</para>
         /// </param>
+        /// <param name="options"/>
         /// <returns></returns>
         public static string Generate(IDictionary<string, IEnumerable<Type>> typesMap, ClosureExternsOptions options)
         {
@@ -46,7 +47,7 @@ namespace ClosureExterns
         /// <summary>
         /// Generates closure externs using the default options.
         /// </summary>
-        /// <param name="types">A set of base types to generate. Any dependencies will also be included recursively
+        /// <param name="typesMap">A set of base types to generate. Any dependencies will also be included recursively
         /// <para>(e.g. if a property of a type is of some type not in the list, that type will be generated as well)</para>
         /// </param>
         /// <returns></returns>
@@ -57,7 +58,7 @@ namespace ClosureExterns
         }
 
         /// <summary>
-        /// Utility. Returns all the types in the same assembly and namespace (or deeper) as the given example type.
+        /// Utility. Returns all the types in the same assembly and namespace as the given example type.
         /// </summary>
         public static IEnumerable<Type> GetTypesInNamespace(Type exampleType)
         {
@@ -85,7 +86,7 @@ namespace ClosureExterns
             foreach (var typePair in this._typesMap)
             {
                 graph.AddVertexRange(typePair.Value.Except(graph.Vertices));
-                var @namespace = String.Empty == typePair.Key ? this._options.NamespaceVarName : typePair.Key;
+                var @namespace = (string.IsNullOrEmpty(typePair.Key) ? this._options.NamespaceVarName : typePair.Key);
                 resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(@namespace));
                 resultBuilder.AppendLine();
 
