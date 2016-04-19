@@ -22,11 +22,10 @@ namespace ClosureExterns.Tests
             public int[] IntArray { get; set; }
         }
 
-
         [TestMethod]
         public void ClosureExternsGenerator_Generate_Test()
         {
-            var types = new Type[] { typeof(A) };
+            var types = new Dictionary<string, IEnumerable<Type>> { { "Types", new Type[] { typeof(A) } } };
             var actual = ClosureExternsGenerator.Generate(types);
             var expected = @"
 /** @const */
@@ -55,10 +54,9 @@ Types.A.prototype.b = null;
 Types.A.prototype.bs = null;
 ";
 
-            Assert.AreEqual(expected.Trim(), actual.Trim()); 
+            Assert.AreEqual(expected.Trim(), actual.Trim());
         }
 
-        
         protected class AClass
         {
             public string StringValue { get; set; }
@@ -81,7 +79,7 @@ Types.A.prototype.bs = null;
         [TestMethod]
         public void ClosureExternsGenerator_GenerateWithOptions_MapType_Test()
         {
-            var types = new Type[] { typeof(AClass) };
+            var types = new Dictionary<string, IEnumerable<Type>> { { "", new Type[] { typeof(AClass) } } };
             var testOptions = GetTestOptions();
             testOptions.MapType = x => typeof(Boolean);
             var actual = ClosureExternsGenerator.Generate(types, testOptions);
@@ -93,11 +91,10 @@ var TestNamespace = {};";
             Assert.AreEqual(expected.Trim(), actual.Trim());
         }
 
-
         [TestMethod]
         public void ClosureExternsGenerator_GenerateWithOptions_NamespaceExpression_Test()
         {
-            var types = new Type[] { };
+            var types = new Dictionary<string, IEnumerable<Type>> { };
             var testOptions = GetTestOptions();
             testOptions.NamespaceDefinitionExpression = x => String.Format("goog.provide('{0}');", x);
             var actual = ClosureExternsGenerator.Generate(types, testOptions);
@@ -115,29 +112,27 @@ var TestNamespace = {};";
         [TestMethod]
         public void ClosureExternsGenerator_DictClass_Test()
         {
-            var types = new Type[] { typeof(DictClass) };
+            var types = new Dictionary<string, IEnumerable<Type>> { { "", new Type[] { typeof(DictClass) } } };
             var actual = ClosureExternsGenerator.Generate(types);
             var expected = @"
 /** @const */
-var Types = {};
+var TestNamespace = {};
 
 // ClosureExterns.Tests.ClosureExternsGeneratorTest+DictClass
 /** @constructor
  */
-Types.DictClass = function() {};
+TestNamespace.DictClass = function() {};
 /** @type {Object.<string, number>} */
-Types.DictClass.prototype.dictProperty = null;
+TestNamespace.DictClass.prototype.dictProperty = null;
 ";
 
             Assert.AreEqual(expected.Trim(), actual.Trim());
         }
 
-
-
         [TestMethod]
         public void ClosureExternsGenerator_GenerateWithOptions_Test()
         {
-            var types = new Type[] { typeof(AClass) };
+            var types = new Dictionary<string, IEnumerable<Type>> { { "TestNamespace", new Type[] { typeof(AClass) } } };
             var testOptions = GetTestOptions();
             var actual = ClosureExternsGenerator.Generate(types, testOptions);
 
@@ -187,7 +182,6 @@ TestNamespace.A.prototype.c = null;
             {
                 ConstructorAnnotations = x => new string[] { "@something " + x },
                 ConstructorExpression = x => "function " + x + "() { }",
-                NamespaceVarName = "TestNamespace",
                 SuffixToTrimFromTypeNames = "Class",
                 TryGetTypeName = x => x.Equals(typeof(BClass)) ? "Bee" : null
             };
