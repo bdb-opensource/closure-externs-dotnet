@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using ClosureExterns.Extensions;
 using QuickGraph.Algorithms;
 
 namespace ClosureExterns
@@ -21,7 +22,7 @@ namespace ClosureExterns
             this._typeNamespaceMap = this._typesMap
                 .SelectMany(p => p.Value
                     .Select(t => new KeyValuePair<Type, string>(t, p.Key)))
-                .ToDictionary(x => x.Key, x => x.Value);
+                .ToDictionary(x => x.Key, x => x.Value.DefaultIfEmpty(this._options.NamespaceVarName));
             this._assemblies = this._typesMap.SelectMany(p => p.Value)
                 .GroupBy(x => x.Assembly)
                 .Select(x => x.Key)
