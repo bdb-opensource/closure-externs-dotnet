@@ -1,10 +1,12 @@
-﻿using System;
+﻿using ClosureExterns.Extensions;
+using ClosureExterns.MetadataHandlers;
+using QuickGraph.Algorithms;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using ClosureExterns.Extensions;
-using QuickGraph.Algorithms;
 
 namespace ClosureExterns
 {
@@ -14,6 +16,12 @@ namespace ClosureExterns
         protected readonly IDictionary<string, IEnumerable<Type>> _typesMap;
         protected readonly ClosureExternsOptions _options;
         protected IDictionary<Type, string> _typeNamespaceMap;
+
+        public static readonly IDictionary<Type, IMetadataHandler> METADATA_HANDLER_MAP = new Dictionary<Type, IMetadataHandler>()
+        {
+            [typeof(MaxLengthAttribute)] = new MaxLengthMetadataHandler(),
+            [typeof(RequiredAttribute)] = new RequiredMetadataHandler()
+        };
 
         protected ClosureExternsGenerator(IDictionary<string, IEnumerable<Type>> typesMap, ClosureExternsOptions options)
         {
@@ -193,8 +201,67 @@ namespace ClosureExterns
                 typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1} = {2};", className, propertyName, GetDefaultJSValue(@namespace, mappedType)));
             }
 
-            typeResultBuilder.AppendLine();
+            // Generate Metadata for properties
+            typeResultBuilder.AppendLine($"// Metadata for {className} properties");
+            var propertyMetadataBuilders = this.GeneratePropertyMetadata(type, className, properties).ToArray();
+            Array.ForEach(propertyMetadataBuilders, b => typeResultBuilder.Append(b.ToString()));
+
             return typeResultBuilder;
+        }
+
+        private IEnumerable<StringBuilder> GeneratePropertyMetadata(Type sourceType, string className, PropertyInfo[] properties)
+        {
+            foreach (var propertyPair in WithIsLast(properties))
+            {
+                var property = propertyPair.Item1;
+                var metadataPairs = this.GetMetadataPairs(property);
+                if (false == metadataPairs.Any())
+                {
+                    continue;
+                }
+
+                this.ValidateDuplicateMetadataKeys(metadataPairs);
+
+                yield return this.GeneratePropertyMetadataDefinitions(sourceType, className, property, metadataPairs);
+            }
+        }
+
+        private KeyValuePair<string, string>[] GetMetadataPairs(PropertyInfo property)
+        {
+            return property
+                .GetCustomAttributes(inherit: false)
+                .OfType<ValidationAttribute>()
+                .Where(x => METADATA_HANDLER_MAP.ContainsKey(x.GetType()))
+                .Select(x => METADATA_HANDLER_MAP[x.GetType()].CreateMetadata(x))
+                .ToArray();
+        }
+
+        private void ValidateDuplicateMetadataKeys(KeyValuePair<string, string>[] keyValuePairs)
+        {
+            var duplicateKeysQuery = keyValuePairs
+                .GroupBy(x => x.Key)
+                .Where(x => x.Count() > 1);
+
+            if (duplicateKeysQuery.Any())
+            {
+                var duplicateKeys = string.Join(",", duplicateKeysQuery.Select(x => x.Key));
+                throw new Exception($"The generated Metadata contains the following duplicate keys: {duplicateKeys}");
+            }
+        }
+
+        private StringBuilder GeneratePropertyMetadataDefinitions(Type sourceType, string className, PropertyInfo property,
+            KeyValuePair<string, string>[] metadataPairs)
+        {
+            var metadataKeyValuePairs = metadataPairs
+                .Select(x => $"{Consts.SPACING_4}{x.Key}: {x.Value}")
+                .ToArray();
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"{className}.prototype.metadata.{this.GetPropertyName(sourceType, property.Name)} = {{");
+            builder.AppendLine(string.Join(string.Format(",{0}", Environment.NewLine), metadataKeyValuePairs));
+            builder.AppendLine("};");
+
+            return builder;
         }
 
         private string GetPropertyName(Type type, string propertyName)
@@ -207,8 +274,7 @@ namespace ClosureExterns
 
             if (false == type.IsEnum)
             {
-                // TODO: Improve the behavior, it should be able to change casing to lower based on words.
-                return propertyName.Substring(0, 1).ToLowerInvariant() + propertyName.Substring(1);
+                return propertyName.ToCamelCase();
             }
 
             return propertyName;
