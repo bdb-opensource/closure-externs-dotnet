@@ -91,7 +91,7 @@ namespace ClosureExterns
                 resultBuilder.AppendLine(this._options.NamespaceDefinitionExpression(@namespace));
                 resultBuilder.AppendLine();
 
-                GenerateTypeDefinitions(@namespace, graph, typeDefinitions);
+                this.GenerateTypeDefinitions(@namespace, graph, typeDefinitions);
             }
             foreach (var type in graph.TopologicalSort().Reverse())
             {
@@ -124,7 +124,7 @@ namespace ClosureExterns
                 foreach (var type in unprocessedTypes)
                 {
                     processedTypes.Add(type);
-                    if (false == InAllowedAssemblies(type))
+                    if (false == this.InAllowedAssemblies(type))
                     {
                         continue;
                     }
@@ -132,7 +132,8 @@ namespace ClosureExterns
                     {
                         continue;
                     }
-                    GenerateTypeDefinition(@namespace, graph, typeDefinitions, type);
+
+                    this.GenerateTypeDefinition(@namespace, graph, typeDefinitions, type);
                 }
             }
         }
@@ -146,13 +147,14 @@ namespace ClosureExterns
         {
             if (type.IsClass)
             {
-                var typeResultBuilder = GenerateClassDefinition(@namespace, type, graph);
-                typeDefinitions.Add(type, typeResultBuilder.ToString());
+                var typeResultBuilder = this.GenerateClassDefinition(@namespace, type, graph);
+                var constTypeResultBuilder = this.GenerateConstClassDefinition(@namespace, type, graph);
+                typeDefinitions.Add(type, typeResultBuilder.Append(constTypeResultBuilder).ToString());
             }
 
             if (type.IsEnum)
             {
-                var typeResultBuilder = GenerateEnumDefinition(@namespace, type, graph);
+                var typeResultBuilder = this.GenerateEnumDefinition(@namespace, type, graph);
                 typeDefinitions.Add(type, typeResultBuilder.ToString());
             }
         }
@@ -186,14 +188,48 @@ namespace ClosureExterns
             foreach (var propertyPair in WithIsLast(properties))
             {
                 var property = propertyPair.Item1;
-                string propertyName = this.GetPropertyName(type, property.Name);
-                var mappedType = MapType(property.PropertyType);
-                var jsTypeName = GetJSTypeName(type, @namespace, mappedType, graph);
-                typeResultBuilder.AppendLine(String.Format("/** @type {{{0}}} */", jsTypeName));
-                typeResultBuilder.AppendLine(String.Format("{0}.prototype.{1} = {2};", className, propertyName, GetDefaultJSValue(@namespace, mappedType)));
+                var propertyName = this.GetPropertyName(type, property.Name);
+                var mappedType = this.MapType(property.PropertyType);
+                var jsTypeName = this.GetJSTypeName(type, @namespace, mappedType, graph);
+                typeResultBuilder.AppendLine($"/** @type {{{jsTypeName}}} */");
+                typeResultBuilder.AppendLine(
+                    $"{className}.prototype.{propertyName} = {this.GetDefaultJSValue(@namespace, mappedType)};");
             }
 
             typeResultBuilder.AppendLine();
+            return typeResultBuilder;
+        }
+
+        protected StringBuilder GenerateConstClassDefinition(string @namespace, Type type, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
+        {
+            var typeResultBuilder = new StringBuilder();
+            var fields = type.GetFields(BindingFlags.Static | BindingFlags.Public)
+                .Where(fi => fi.IsLiteral && (false == fi.IsInitOnly))
+                .ToArray();
+
+            if (false == fields.Any())
+            {
+                return typeResultBuilder;
+            }
+
+            Console.Error.WriteLine("Generating Const Class: " + type.Name);
+
+            var className = this.GetFullTypeName(@namespace, type) + "Consts";
+            AppendConstTypeComment(typeResultBuilder, type);
+            typeResultBuilder.AppendLine($"{className} = {{");
+
+            foreach (var fieldPair in WithIsLast(fields))
+            {
+                var field = fieldPair.Item1;
+                var mappedType = this.MapType(field.FieldType);
+                var jsTypeName = this.GetJSTypeName(type, @namespace, mappedType, graph);
+                typeResultBuilder.AppendLine($"/** @type {{{jsTypeName}}} */");
+
+                typeResultBuilder.AppendLine(
+                    $"{field.Name}: { this.GetJSValue(field.GetValue(obj: null))},");
+            }
+
+            typeResultBuilder.AppendLine("}");
             return typeResultBuilder;
         }
 
@@ -246,9 +282,16 @@ namespace ClosureExterns
             return "null";
         }
 
+        private string GetJSValue(object value) => $"'{value}'";
+
         protected static void AppendTypeComment(StringBuilder typeResultBuilder, Type type)
         {
             typeResultBuilder.AppendLine("// " + type.FullName);
+        }
+
+        protected static void AppendConstTypeComment(StringBuilder typeResultBuilder, Type type)
+        {
+            typeResultBuilder.AppendLine("// " + type.FullName + " Consts");
         }
 
         protected static IEnumerable<Tuple<T, bool>> WithIsLast<T>(T[] items)
@@ -269,7 +312,7 @@ namespace ClosureExterns
                 {
                     if (IsGenericTypeNullable(propertyType))
                     {
-                        return "?" + GetJSTypeName(sourceType, @namespace, Nullable.GetUnderlyingType(propertyType), graph);
+                        return "?" + this.GetJSTypeName(sourceType, @namespace, Nullable.GetUnderlyingType(propertyType), graph);
                     }
                     var dictionaryType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IDictionary<,>));
                     if (null != dictionaryType)
@@ -277,28 +320,28 @@ namespace ClosureExterns
                         var typeArgs = dictionaryType.GetGenericArguments().ToArray();
                         var keyType = typeArgs[0];
                         var valueType = typeArgs[1];
-                        return GetJSObjectTypeName(sourceType, @namespace, keyType, valueType, graph);
+                        return this.GetJSObjectTypeName(sourceType, @namespace, keyType, valueType, graph);
                     }
                     var enumerableType = propertyType.GetInterfaces().SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IEnumerable<>));
                     if (null != enumerableType)
                     {
-                        return GetJSArrayTypeName(sourceType, @namespace, enumerableType.GetGenericArguments().Single(), graph);
+                        return this.GetJSArrayTypeName(sourceType, @namespace, enumerableType.GetGenericArguments().Single(), graph);
                     }
                 }
                 if (propertyType.IsArray)
                 {
                     var elementType = propertyType.GetElementType();
-                    return GetJSArrayTypeName(sourceType, @namespace, elementType, graph);
+                    return this.GetJSArrayTypeName(sourceType, @namespace, elementType, graph);
                 }
             }
             graph.AddVertex(propertyType);
             graph.AddVertex(sourceType);
-            if (InAllowedAssemblies(propertyType))
+            if (this.InAllowedAssemblies(propertyType))
             {
                 graph.AddEdge(new QuickGraph.Edge<Type>(sourceType, propertyType));
                 return this.GetFullTypeName(@namespace, propertyType);
             }
-            return overrideTypeName ?? GetTypeName(propertyType);
+            return overrideTypeName ?? this.GetTypeName(propertyType);
         }
 
         private static bool IsGenericTypeNullable(Type propertyType)
@@ -308,19 +351,19 @@ namespace ClosureExterns
 
         private string GetJSArrayTypeName(Type sourceType, string @namespace, Type propertyType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Array.<" + GetJSTypeName(sourceType, @namespace, propertyType, graph) + ">";
+            return "Array.<" + this.GetJSTypeName(sourceType, @namespace, propertyType, graph) + ">";
         }
 
         private string GetJSObjectTypeName(Type sourceType, string @namespace, Type keyType, Type valueType, QuickGraph.AdjacencyGraph<Type, QuickGraph.Edge<Type>> graph)
         {
-            return "Object.<" + GetJSTypeName(sourceType, @namespace, keyType, graph) + ", " + GetJSTypeName(sourceType, @namespace, valueType, graph) + ">";
+            return "Object.<" + this.GetJSTypeName(sourceType, @namespace, keyType, graph) + ", " + this.GetJSTypeName(sourceType, @namespace, valueType, graph) + ">";
         }
 
         protected string GetTypeName(Type type)
         {
             // Strip `1 (or `2, etc.) suffix from generic types
             var typeName = new string(type.Name.TakeWhile(char.IsLetterOrDigit).ToArray());
-            if (InAllowedAssemblies(type))
+            if (this.InAllowedAssemblies(type))
             {
                 if (false == string.IsNullOrWhiteSpace(this._options.SuffixToTrimFromTypeNames))
                 {
@@ -358,11 +401,11 @@ namespace ClosureExterns
             var typeResultBuilder = new StringBuilder();
             AppendTypeComment(typeResultBuilder, type);
             typeResultBuilder.AppendLine("/** @enum {string} */");
-            typeResultBuilder.AppendLine(GetFullTypeName(@namespace, type) + " = {");
+            typeResultBuilder.AppendLine(this.GetFullTypeName(@namespace, type) + " = {");
             foreach (var pair in WithIsLast(Enum.GetNames(type)))
             {
-                string propertyValue = pair.Item1;
-                string propertyName = this.GetPropertyName(type, propertyValue);
+                var propertyValue = pair.Item1;
+                var propertyName = this.GetPropertyName(type, propertyValue);
                 var spacing = pair.Item2 ? String.Empty : ",";
                 typeResultBuilder.AppendFormat("    '{0}': '{1}'{2}{3}", propertyName, propertyValue, spacing, Environment.NewLine);
             }
@@ -379,7 +422,7 @@ namespace ClosureExterns
                 typeNamespace = @namespace;
             }
             var overrideTypeName = this._options.TryGetTypeName(type);
-            return typeNamespace + "." + (overrideTypeName ?? GetTypeName(type));
+            return typeNamespace + "." + (overrideTypeName ?? this.GetTypeName(type));
         }
 
         #endregion

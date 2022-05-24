@@ -176,6 +176,39 @@ TestNamespace.A.prototype.c = null;
             Assert.AreEqual(expected.Trim(), actual.Trim());
         }
 
+        protected class C
+        {
+            public const string TEST_NAME = "TEST";
+        }
+
+        [TestMethod]
+        public void ClosureExternsGenerator_GenerateConstantss_Test()
+        {
+            var types = new Dictionary<string, IEnumerable<Type>> { { "TestNamespace", new Type[] { typeof(C) } } };
+            var testOptions = GetTestOptions();
+            var actual = ClosureExternsGenerator.Generate(types, testOptions);
+
+            var expected = @"
+/** @const */
+var TestNamespace = {};
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+C
+/** @constructor
+ * @something TestNamespace.C
+ */
+TestNamespace.C = function TestNamespace.C() { };
+
+// ClosureExterns.Tests.ClosureExternsGeneratorTest+C Consts
+TestNamespace.CConsts = {
+/** @type {string} */
+TEST_NAME: 'TEST',
+}
+
+";
+
+            Assert.AreEqual(expected.Trim(), actual.Trim());
+        }
+
         private static ClosureExternsOptions GetTestOptions()
         {
             return new ClosureExternsOptions()
